@@ -1,9 +1,9 @@
 Package: bis557
 Type: Package
-Title: What the package does (short line)
+Title: Output of BIS 557
 Version: 0.1.0
 Author: Chang Su
-Maintainer: Michael Kane <michael.kane@yale.edu>
+Maintainer: Chang Su <c.su@yale.edu>
 Description: Assignments, code, and digital artifacts for BIS 557.
 License: Apache License 2.0
 RoxygenNote: 6.1.0
