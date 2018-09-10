@@ -2,7 +2,7 @@ Package: bis557
 Type: Package
 Title: What the package does (short line)
 Version: 0.1.0
-Author: Michael Kane
+Author: Chang Su
 Maintainer: Michael Kane <michael.kane@yale.edu>
 Description: Assignments, code, and digital artifacts for BIS 557
 License: Apache License 2.0
