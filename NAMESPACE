@@ -2,3 +2,4 @@
 
 export(linear_model)
 importFrom(stats,lm)
+importFrom(stats,model.matrix)

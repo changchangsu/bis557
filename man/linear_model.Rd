@@ -7,7 +7,7 @@
 linear_model(formula, data)
 }
 \arguments{
-\item{formula}{a formula}
+\item{formula}{formula of the regression model}
 
 \item{data}{a data.frame}
 }
@@ -15,7 +15,7 @@ linear_model(formula, data)
 An lm object
 }
 \description{
-This function passes parameters to the lm function.
+This function use QR decomposition to solve OLS.
 }
 \examples{
 fit <- linear_model(Sepal.Length ~., iris)
