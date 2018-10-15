@@ -7,11 +7,11 @@
 ridge_reg(form, lambda, d)
 }
 \arguments{
+\item{form}{formula of the regression model, where intercept term is dropped}
+
 \item{lambda}{tuning parameter of ridge regression, controlling panalty}
 
-\item{formula}{formula of the regression model, where intercept term is dropped}
-
-\item{data}{a data.frame, with each column scaled to have mean 0 and unit vairance}
+\item{d}{a data.frame, with each column scaled to have mean 0 and unit vairance}
 }
 \value{
 An Ridge object
@@ -20,6 +20,8 @@ An Ridge object
 This function use SVD decomposition to solve ridge regression.
 }
 \examples{
-fit <- ridge_reg(y ~.-1, ridge_train, 0.01)
+data(ridge_train)
+ridge_train_scale <- as.data.frame(scale(ridge_train))
+fit <- ridge_reg(y ~. - 1, 0.01, ridge_train_scale)
 summary(fit)
 }

@@ -1,13 +1,15 @@
 #' Fit a Ridge Regression model with given lambda
 #'
 #' @description This function use SVD decomposition to solve ridge regression.
-#' @param formula formula of the regression model, where intercept term is dropped
-#' @param data a data.frame, with each column scaled to have mean 0 and unit vairance
+#' @param form formula of the regression model, where intercept term is dropped
+#' @param d a data.frame, with each column scaled to have mean 0 and unit vairance
 #' @param lambda tuning parameter of ridge regression, controlling panalty
 #' @return An Ridge object
 #' @importFrom stats model.matrix
 #' @examples
-#' fit <- ridge_reg(y ~.-1, ridge_train, 0.01)
+#' data(ridge_train)
+#' ridge_train_scale <- as.data.frame(scale(ridge_train))
+#' fit <- ridge_reg(y ~. - 1, 0.01, ridge_train_scale)
 #' summary(fit)
 #' @export
 #' 
