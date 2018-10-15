@@ -1,0 +1,46 @@
+---
+title: "homework-2"
+author: "Chang Su"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    self_contained: yes
+    toc: true
+---
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{The linear model vignette}
+-->
+
+## The ridge-reg function
+
+Ridge regression can be conceptulized as, adding an scaled L-2 penalty term to the sum of squares and solving this new 'least square' problem. It major benefits lie in improving the prediction performance on new samples.
+
+To apply this method, a hyperparameter, $\lamba$, needs to be manually tuned to determine the 'weight' of the penalty. Usually, it is selected as the value minimizing the out-of-sample mean square error.
+
+Here, we provide an implementation of the ridge regression, which relys on pre-scaled data and fit a ridge regression model with no intercept term using SVD. The following example is based on datasets ridge_train and ridge_test given in the package.
+
+```{r}
+library(bis557)
+library(ggplot2)
+data(ridge_train)
+ridge_train_scale <- as.data.frame(scale(ridge_train))
+ridge_reg_coefs <- lapply(lambda, function(x) ridge_reg(y ~. - 1, x, ridge_train_scale)$coef)
+data(ridge_test)
+ridge_test_matrix <- matrix(unlist(ridge_test), ncol = 5, byrow = F)
+ridge_test_matrix <- scale(ridge_test_matrix)
+
+lambda = sapply(seq(0,4, by = 0.1),function(x) exp(x)-1)
+
+O_MSE <- sapply(ridge_reg_coefs, function(x) 
+  sum((ridge_test_matrix[,2:5]%*% x - ridge_test_matrix[,1])^2))
+plot_df <- data.frame(MSE = O_MSE, lambda = lambda)
+
+ggplot(data = plot_df, aes(x = lambda, y = MSE)) +
+  geom_point() +
+  geom_line() +
+  labs(y = 'out of sample sum of squares', title = 'ridge trace plot') + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+From the ridge trace, it's clear that lambda value aournd 28 is what we want, because it optimizes the balance between bias and varaince and minimies the out of sample sum of squares.
