@@ -55,7 +55,7 @@ It's clear from the plot of 'Kernel Density Estimates for Different Choices of B
 
 - The estimate is 'smoother' if the bandwidth is larger. If it is too small, the estimated density would be overfitted and dragged away by single data point; while if it is too big, the estimated density would be over-smooth / flat.
 
-- The kernel density estimation can give goood estimate of the true density when bandwidth is chosen properly. (The green line gives the best fit among 4 candidates of h, which is close the true distribution, a mixture of Gaussian)
+- The kernel density estimation can give goood estimate of the true density when bandwidth is chosen properly. (green, blue and purple lines are all relatively representative of a mixture of Gaussian)
 
 
 # 2. CASL page 200, question 3
@@ -147,9 +147,9 @@ Given the scenario it's used, we implement a check_kkt function and it's going t
 
 2. Fit the LASSO with $\lambda_1=0.11$
 
-3. Apply $\text{check_kkt}$ to select the active set of $\beta_{\lambda_1=0.11}$ under $\lambda_2=0.1$.
+3. Apply $\text{check_kkt}$ to select a subset of $\beta_{\lambda_1=0.11}$, where all $\beta$ s inside will be inactive under $\lambda_2=0.1$.
 
-4. Check if the would-stay-inactive $\beta$ s are 0 even after the model is refitted with $\lambda_2=0.1$. If so, we can argue that the check_kkt is correctly implemented.
+4. Check if these would-stay-inactive $\beta$ s are 0 even after the model is refitted with $\lambda_2=0.1$. If so, we can argue that the check_kkt is correctly implemented.
 
 ```{r}
 # Try two similar penalty parameters and fit LASSO with glmnet

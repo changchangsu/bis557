@@ -17,7 +17,7 @@ kern_density <- function(x, x_new, h=1){
   
   n <- length(x)
   sapply(x_new, function(new){
-    1/(n*h) * sum(epan_kernel((x-new)/h, h))
+    1/n * sum(epan_kernel(x-new, h))
   })
   
 }
