@@ -7,7 +7,7 @@ Maintainer: Chang Su <c.su@yale.edu>
 Description: Assignments, code, and digital artifacts for BIS 557.
 License: Apache License 2.0
 RoxygenNote: 6.1.0
-Suggests: testthat, knitr, rmarkdown, ggplot2
+Suggests: testthat, knitr, rmarkdown, ggplot2, glmnet
 Imports: stats
 VignetteBuilder: knitr
 Encoding: UTF-8

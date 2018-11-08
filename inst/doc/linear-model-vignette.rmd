@@ -9,7 +9,7 @@ output:
 ---
 <!--
 %\VignetteEngine{knitr::rmarkdown}
-%\VignetteIndexEntry{The liner model vignette}
+%\VignetteIndexEntry{The linear model vignette}
 -->
 
 ## The linear_model function
