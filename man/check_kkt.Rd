@@ -16,8 +16,8 @@ check_kkt(x, y, beta, lambda)
 \item{lambda}{penalty parameter}
 }
 \value{
-a logical vector indicating where KKT the condition is violated 
-by the zero-valued coeffcients.
+a logical vector indicating where KKT the condition will be violated 
+for the coeffcients whose current values are 0.
 }
 \description{
 Check KKT condition for the beta for some iteration

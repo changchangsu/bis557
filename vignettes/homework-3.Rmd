@@ -24,11 +24,12 @@ In other words, the property that the integral of the kernel equal to 1 is impor
 
 Next, illustrate the function kernel_estimates by estimating the density of some test data based on the train data from the same distribution.
 
+## mixture of Gaussian
 ```{r}
-# First, construct a dataset, where data is from a mixture of normal distribution
+# Construct the first data set: a mixture of normal distribution
 set.seed(1234)
 d <- c(rnorm(500,10,1), rnorm(500,0,3))
-hist(d)
+hist(d,main = "Distribution of Data Simulated from a Mixture of Gaussian")
 # Split the data into train and test set (7:3)
 train_index <- sample.int(1000,700)
 dtrain <- d[train_index]
@@ -43,12 +44,14 @@ kernel_estimates <- sapply(hs, function(h){
 })
 dtest_df <- data.frame(kern = as.vector(kernel_estimates),
                        bandwidth = rep(hs, each = length(dtest)),
-                       data = dtest)
-# Visualize the density estiamted by Epanechnikov kernel with 4 different bandwidths.
+                       dtest = dtest)
+# Visualize the density estiamted by Epanechnikov kernel with 4 different bandwidths. Also plot the histogram for reference.
 library(ggplot2)
-ggplot(dtest_df) + geom_line(aes(x = data, y = kern, color = as.factor(bandwidth))) + scale_color_discrete(name = "Bandwidth") +
+ggplot(dtest_df, aes(x = dtest)) + geom_line(aes(x = dtest, y = kern, color = as.factor(bandwidth))) + scale_color_discrete(name = "Bandwidth") +
   labs(y = "Density Estimate", x = "Test Data", title = "Kernel Density Estimates for Different Choices of Bandwidths") +
-  theme(legend.position="bottom", title = element_text(size=14), legend.text=element_text(size=12))
+  theme(legend.position="bottom", title = element_text(size=14), legend.text=element_text(size=12)) +
+  geom_histogram(binwidth=1, colour="black", alpha = 0.1,
+                          aes(y=..density..))
 ```
 
 It's clear from the plot of 'Kernel Density Estimates for Different Choices of Bandwidths' that, 
@@ -56,6 +59,32 @@ It's clear from the plot of 'Kernel Density Estimates for Different Choices of B
 - The estimate is 'smoother' if the bandwidth is larger. If it is too small, the estimated density would be overfitted and dragged away by single data point; while if it is too big, the estimated density would be over-smooth / flat.
 
 - The kernel density estimation can give goood estimate of the true density when bandwidth is chosen properly. (green, blue and purple lines are all relatively representative of a mixture of Gaussian)
+
+## chi square distribution
+```{r}
+d2 <- rchisq(1000,5)
+hist(d2,main = "Distribution of Data Simulated from Chi-Square (5)") 
+# Split the data into train and test set (7:3)
+train_index <- sample.int(1000,700)
+dtrain <- d2[train_index]
+dtest <- d2[!(1:1000 %in% train_index)]
+
+hs <- seq(0.1,3.1,by=1)
+kernel_estimates <- sapply(hs, function(h){
+  kern_density(dtrain, dtest, h)
+})
+dtest_df <- data.frame(kern = as.vector(kernel_estimates),
+                       bandwidth = rep(hs, each = length(dtest)),
+                       dtest = dtest)
+ggplot(dtest_df, aes(x = dtest)) + geom_line(aes(x = dtest, y = kern, color = as.factor(bandwidth))) + scale_color_discrete(name = "Bandwidth") +
+  labs(y = "Density Estimate", x = "Test Data", title = "Kernel Density Estimates for Different Choices of Bandwidths") +
+  theme(legend.position="bottom", title = element_text(size=14), legend.text=element_text(size=12))+
+  stat_function(fun=dchisq,
+                         color="black",
+                         args=list(df=5))
+```
+
+We again plot the kernel density estimate of the data under 4 different lambdas. Notice that in this plot the black line is the 'true' density function that the data is simulated from. The interpretation here is similar to the 1st dataset.
 
 
 # 2. CASL page 200, question 3
@@ -106,9 +135,10 @@ $\because \dfrac{1}{2n}>0, \lambda(1-\alpha)\dfrac{1}{2}>0, \lambda \alpha >0$ a
 The object function $f(\beta;\lambda,\alpha)$ is convex.
 
 # 5. CASL page 200, question 6
+
 Find the KKT conditions for glmnet when 0 < α ≤ 1; write a function that checks for the KKT conditions for alpha=1 and show that it works
 
-Recall the KKT condition to check when updating beta:
+The KKT condition to check when updating beta:
 
 $$\dfrac{1}{n}\sum_{i=1}^n x_{il}(y_i-\sum_{j=1}^px_{ij}\hat{\beta_j})=\lambda s_l$$
 
@@ -121,6 +151,52 @@ s_l \in  \begin{cases}
 \end{cases}
 \end{aligned}
 
+## The implmentation of check_kkt
+```{r, eval = F}
+#' Check KKT
+#'
+#' @description Check KKT condition for efficient Coordinate Descent
+#' @param x design matrix
+#' @param y response vector
+#' @param beta regression coefficients fitted under the current (i-th) lambda
+#' @param lambda the next ((i+1)-th) penalty parameter
+#' @return a logical vector indicating where KKT the condition will be violated 
+#' for the coeffcients whose current values (i-th) are 0. 
+#' @export
+#' 
+check_kkt <- function(x, y, beta, lambda){
+  
+  n <- nrow(x)
+  resid <- y - x %*% beta
+  s <- 1/n * t(x) %*% resid * 1/lambda
+  
+  return (list(stay_inactive = (beta == 0) & abs(s) < 1,
+               add_to_active = (beta == 0) & abs(s) >= 1))
+  
+}
+```
+
+$\textbf{Justify the check_kkt function}$: use it to check the kkt condition under $\lambda=0.1$ for beta coefficients obtained from $\lambda=0.11$.
+
+Define 'inactive set' as the set of $\beta$ s which (should) equal to 0, 'active set' as the set of non-zero coefficients.
+
+Suppose we have fitted the slope coefficient under $\lambda_1$, $\beta(\lambda_1)$, where some are inactive (=0) and some are not. Now we are going to fit the LASSO for the next penalty parameter, $\lambda_2$.
+
+Suppose $\lambda_2$ is numerically close to $\lambda_1$, it's straightforward that we will refit the model with $\beta_{\lambda_1}$ as starting point.
+
+Here's where active set screening comes into play. Based on the intuition that the $\beta$ s inactive under $\lambda_1$ are also likely to be inactive under $\lambda_2$, active set screening tells the would-stay-inactive $\beta$ s and change-to-active $\beta$ s by checking the KKT condition for each predictor, greatly reduce the computational cost because only few active $\beta$ s would enter the coordinate descent procedure.
+
+Given the scenario it's used, we implement a check_kkt function and it's going to be justified in the following steps:
+
+1. Generate a high-dimensional data set where it's proper to use LASSO
+
+2. Fit the LASSO with $\lambda_1=0.11$
+
+3. Apply $\text{check_kkt}$ to select a subset of $\beta_{\lambda_1=0.11}$, where all $\beta$ s inside will be inactive under $\lambda_2=0.1$.
+
+4. Check if these would-stay-inactive $\beta$ s are 0 even after the model is refitted with $\lambda_2=0.1$. If so, we can argue that the check_kkt is correctly implemented.
+
+## Data Simulation
 ```{r,message=FALSE}
 library(glmnet)
 # Generate a dataset with n<p and with only few variables actually contributing to the prediction
@@ -133,24 +209,7 @@ x <- matrix(rnorm(n*p), nrow = n, ncol = p)
 y <- apply(x[,1:p_true], 1, sum) + rnorm(n)
 ```
 
-$\textbf{Justify the check_kkt function}$: use it to check the kkt condition under $\lambda=0.1$ for beta coefficients obtained from $\lambda=0.11$.
-
-Suppose we have fitted the slope coefficient under $\lambda_1$, $\beta(\lambda_1)$, where some are inactive (=0) and some are not. Now we are going to fit the LASSO for the next penalty parameter, $\lambda_2$.
-
-Suppose $\lambda_2$ is numerically close to $\lambda_1$, it's straightforward that we will refit the model with $\beta_{\lambda_1}$ as starting point.
-
-Here's where active set screening comes into play. Based on the intuition that the $\beta$ s inactive under $\lambda_1$ are also likely to be inactive under $\lambda_2$, active set screening tells the would-stay-inactive $\beta$ s and change-to-active $\beta$ s by checking the KKT condition for each predictor, greatly reduce the computational cost because only few active $\beta$ s would eneter the coordinate descent procedure.
-
-Given the scenario it's used, we implement a check_kkt function and it's going to be justified in the following steps:
-
-1. Generate a high-dimensional data set where it's proper to use LASSO
-
-2. Fit the LASSO with $\lambda_1=0.11$
-
-3. Apply $\text{check_kkt}$ to select a subset of $\beta_{\lambda_1=0.11}$, where all $\beta$ s inside will be inactive under $\lambda_2=0.1$.
-
-4. Check if these would-stay-inactive $\beta$ s are 0 even after the model is refitted with $\lambda_2=0.1$. If so, we can argue that the check_kkt is correctly implemented.
-
+## Fit LASSO and apply check-kkt
 ```{r}
 # Try two similar penalty parameters and fit LASSO with glmnet
 lambdas <- c(0.1, 0.11)
@@ -163,5 +222,12 @@ all(LASSO_fit$beta[,1][kkt_status$stay_inactive] == 0)
 sum(kkt_status$stay_inactive)
 ```
 
+Also, we can check if $\text{check_kkt}$ is correctly implemented by checking the KKT condition for beta coefficients under the same lambda, e.g. $\beta_{\lambda=0.11}$.
 
+For $\beta$ s which meet the critieria for staying in the inactive set, it would remain value 0 after CD on all $\beta$ s. As a result, those which obtain a non-zero value must not be in the stay_inactive list. The following commands correspond to this idea.
+
+```{r}
+kkt_status_same_lambda = check_kkt(x, y, as.vector(LASSO_fit$beta[,1]), lambdas[1])
+all(kkt_status_same_lambda$stay_inactive[LASSO_fit$beta[,1] != 0] == FALSE)
+```
 

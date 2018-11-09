@@ -6,8 +6,8 @@
 #' @param y response vector
 #' @param beta regression coefficients fitted in the last iteration
 #' @param lambda penalty parameter 
-#' @return a logical vector indicating where KKT the condition is violated 
-#' by the zero-valued coeffcients.
+#' @return a logical vector indicating where KKT the condition will be violated 
+#' for the coeffcients whose current values are 0.
 #' @export
 #' 
 
