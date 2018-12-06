@@ -1,0 +1,362 @@
+---
+title: "homework-4"
+author: "Chang Su"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    self_contained: yes
+    toc: true
+---
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{The Vignette for Homework 4}
+-->
+
+# the Logistic Variation of Hessian Matrix
+
+1. CASL Number 2 in Exercises 5.8.
+
+Recall the logistic variation of Hessian matrix:
+
+$$H = X'diag(p(1-p))X$$
+
+Intuitively, the matrix H would be ill-conditioned when some of the $p(1-p)$ is close to 0. 
+
+By the logistic model, $p = \dfrac{1}{1+e^{-X'\beta}}$. Intuitively, an entry of p would be close to 1 if $X_i'\beta$ is positive and very large. 
+
+Follow this intuition, consider the model: $E(Y)=\dfrac{1}{1+e^{-X'\beta}}$, where $\beta=\begin{bmatrix} 1 \\ 2 \\ -1 \end{bmatrix}$.
+
+Construct a data set where any observation $X_i$ is such that $X_i'\beta >>0$. In specific, we make the first observation meeting such criterion.
+
+```{r}
+n = 10
+X_design = matrix(c(-100000, rnorm(3 * n -1)), nrow = n, byrow = T)
+X_design
+```
+
+Consider the rank of $W = diag(p(1-p))$:
+
+```{r}
+beta = c(1,2,-1)
+p = 1/(1+exp(-X_design %*% beta))
+p
+W <- diag(as.vector(p * (1-p)))
+qr(W)$rank
+dim(W)
+#qr(t(X_design) %*% W %*% X_design)$rank
+```
+
+It's clear that W is not invertiable. Based on this, it would be numerically unstable to compute the logistic version of Hessian matrix and such Hessian is ill-conditioned.
+
+Meanwhile, inspect the rank of the linear Hessian: $X'X$.
+
+```{r}
+H <- crossprod(X_design,X_design)
+qr(H)$rank 
+dim(H)
+```
+
+The linear Hessian is well-conditioned.
+
+# IRWLS with Ridge Penalty
+
+2. CASL Number 4 in Exercises 5.8. 
+
+## Derivation 
+Reference:
+https://www.stat.cmu.edu/~cshalizi/uADA/15/lectures/13.pdf
+http://data.princeton.edu/wws509/notes/a2s2.html
+
+The following notation is consistent with IRWLS on p128 of CASL.
+
+If we add a ridge penalty, now $H^{-1}_l(\beta^{(k)}) =-(X^TWX-2\lambda I)$, $\triangledown_l(\beta^{(k)})=X^T (Y-g^{-1}(X\beta^{(k)})-2\lambda \beta^{(k)}$.
+
+Therefore,
+
+\begin{aligned}
+\beta^{(k+1)} &= \beta^{(k)} - H^{-1}_l(\beta^{(k)}) \triangledown_l(\beta^{(k)}) \\
+&= \beta^{(k)} + V^{-1} \{[X^T Y-g^{-1}(X\beta^{(k)})]-2\lambda \beta^{(k)}\})\\
+&= V^{-1}V\beta^{(k)} -2\lambda V^{-1} \beta^{(k)} + V^{-1}[X^T Y-g^{-1}(X\beta^{(k)})] \\
+&= V^{-1} X^TWX \beta^{(k)}+ V^{-1}[X^T Y-g^{-1}(X\beta^{(k)})]\\
+&= V^{-1} X^TWX \beta^{(k)}+ V^{-1}[X^T W W^{-1}Y-g^{-1}(X\beta^{(k)})]\\
+&= V^{-1} X^TW\{X \beta^{(k)} + W^{-1}Y-g^{-1}(X\beta^{(k)})\}\\
+&= (X^TWX+2\lambda I)^{-1} X^TW z
+\end{aligned}
+
+where $V=X^TWX+2\lambda I$, $W=diag(g^{-1})'(X\beta^{(k)})$, $z = X \beta^{(k)} + W^{-1}(Y-g^{-1}(X\beta^{(k)}))$
+
+## Implementation
+
+```{r}
+# Solve generalized linear models with ridge penalty with IRWLS
+#
+# Args:
+#     X: A numeric data matrix.
+#     y: Response vector.
+#     family: Instance of an R ‘family‘ object.
+#     maxit: Integer maximum number of iterations.
+#     tol: Numeric tolerance parameter.
+#     lambda: the hyperparameter for ridge penalty
+#
+# Returns:
+#     Regression vector beta of length ncol(X).
+
+glm_irwls_l2 <-
+function(X, y, family, maxit=25, tol=1e-10, lambda=0.01)
+{
+  beta <- rep(0,ncol(X))
+  for(j in seq_len(maxit))
+  {
+    b_old <- beta
+    eta <- X %*% beta
+    mu <- family$linkinv(eta)
+    mu_p <- family$mu.eta(eta)
+    z <- eta + (y - mu) / mu_p
+    W <- as.numeric(mu_p^2 / family$variance(mu))
+    XtX <- crossprod(X, diag(W) %*% X) + 2*lambda*diag(ncol(X))
+    V <- XtX + 2*lambda*diag(ncol(X)) # V
+    Xtz <- crossprod(X, W * z)
+    beta <- solve(V, Xtz)
+    if(sqrt(crossprod(beta - b_old)) < tol) break
+  }
+beta }
+
+```
+
+## Example
+### Construct family-specific parameters
+```{r}
+## define the family parameter
+bi_fam <- list(linkinv = linkinv <- function(eta){as.numeric(1/(1+exp(-eta)))},
+               mu.eta = mu.eta <- function(eta){as.numeric(1/((1+exp(-eta))*(1+exp(eta))))},
+               variance = variance <- function(mu){
+                 as.numeric(mu * (1-mu))
+               })
+
+```
+
+### Generate some random high-dimensional data (n<p) to test this function.
+```{r}
+set.seed(1234)
+n <- 1000
+n_test <- 200
+p_true <- 5
+beta_true <- c(1, 2, 0.2, 0.1, -1.5)
+
+generate_data <- function(p, p_true = 5){
+  X_irlws <- cbind(1, matrix(rnorm((n + n_test)* (p-1)), ncol = p- 1))
+  beta <- matrix(beta_true, ncol = 1)
+  eta <- X_irlws[,1:p_true] %*% beta
+  mu <- 1/(1+exp(-eta))
+  Y_irlws <- as.numeric(runif(n+n_test) < mu)
+  cat("#1 in Y:", sum(Y_irlws))
+  train_index <- sample.int(n + n_test, n)
+  X_irlws_train <- X_irlws[train_index,]
+  X_irlws_test <- X_irlws[! (1:(n+n_test) %in% train_index),]
+  Y_irlws_train <- Y_irlws[train_index]
+  Y_irlws_test <- Y_irlws[! (1:(n+n_test) %in% train_index)]
+  list(X_irlws_train, Y_irlws_train, X_irlws_test, Y_irlws_test)
+}
+
+data_normal <- generate_data(5)
+
+irwls_normal <- glm_irwls_l2(X = data_normal[[1]], y = data_normal[[2]], family = bi_fam, lambda = 0)
+irwls_normal
+```
+
+This is reansonably close to the true $\beta= c(1, 2, 0.2, 0.1, -1.5)$. Hence, this implementation of binomial family parameters is functioning properly.
+
+Next, evaluate its performance on high-dimnesional binary outcome data.
+
+```{r}
+# only 5 variables are contributing to the reponse variables wand 10 irrelevant, randomly generated variables were added to the deisgn matrix.
+data_high_dim  <- generate_data(15) 
+irwls_no_lambda <- glm_irwls_l2(X = data_high_dim[[1]], y = data_high_dim[[2]], family = bi_fam, lambda = 0)
+as.numeric(irwls_no_lambda)
+```
+The redundant variables V6-V15 are fitted with non-zero coefficients. After these noises are introduced, estiamtes for V1-V5 (true working variables) are on average less accurate. Consider apply ridge penalty to achieve better estimates.
+
+
+```{r}
+irwls_lambda <- glm_irwls_l2(X = data_high_dim[[1]], y = data_high_dim[[2]], family = bi_fam, lambda = 1)
+as.numeric(irwls_lambda)
+```
+
+Compared to the previous case where no ridge penalty was used, the maginitude of estimates are generally smaller. While the estiamtes of V1-V5 are NOT necessarily closer to the truth (which should not be surprising because generally speaking, optimizing L2 penalized likelihood is equivalent to balancing bias-variance tradeoff, where bias is not necessarily minimized), the estimates of V6-V15 are becuase they are closer to 0.
+
+# Functions for Sparse Matrix Computation
+3. Consider the sparse matrix implementation from class and the sparse add
+function:
+```{r}
+sparse_add <- function(a, b) {
+  c <- merge(a, b, by = c("i", "j"), all = TRUE, suffixes = c("1", "2"))
+  c$x1[is.na(c$x1)] <- 0
+  c$x2[is.na(c$x2)] <- 0
+  c$x <- c$x1 + c$x2
+  c[, c("i", "j", "x")]
+}
+
+a <- data.frame(i = c(1, 2), j = c(1, 1), x = c(3, 1))
+b <- data.frame(i = c(1, 2, 2), j = c(1, 1, 2), x = c(4.4, 1.2, 3))
+sparse_add(a, b)
+```
+        - Implement a `sparse_multiply` function that multiplies two sparse matrices.
+        - Create a new class `sparse.matrix` that has add `+`, multiply `%*%`, and transpose `t()` methods.
+        - Add test-sparse-matrix.r to the testthat directory of your bis557 package to show it works.
+      
+## Define the 'sparse.matrix' class
+and basic helper function
+```{r}
+#' Generate a sparse.matrix object from regular matrix
+#'
+#' @description Generate a sparse.matrix object from regular matrix
+#' @param i the row coordinate of the entry
+#' @param j the column coordinate of the entry
+#' @param x the value at the entry
+#' @param dims dimension of the matrix (if not specified, inferred from the largest i and j.)
+#' @return a 3 column (ith coordinate, jth coordinate, value) representation of the matrix
+#' @export
+#' 
+
+sparse.matrix <- function(i, j, x, dims = c(max(i), max(j))){
+  a = matrix(c(i,j,x), nrow = length(i))
+  colnames(a) <- c("i", "j", "x")
+  #class(a) <- append(class(a),"sparse.matrix")
+  class(a) <- append("sparse.matrix", class(a))
+  attributes(a)$true_dims = dims
+  return (a)
+}
+
+# a helper function
+#' Convert a data.frame object into a sparse.matrix object
+#'
+#' @description Convert a data frame into a sparse.matrix object
+#' @param df a data frame in the specific form: with (i,j,x) columns
+#' @param dims the dimension of the underlying dense matrix
+#' @return a sparse.matrix object
+#' @export
+#' 
+
+to_sparse_matrix <- function(df, dims){
+  a <- matrix(c(df$i, df$j, df$x), nrow = nrow(df), byrow = F)
+  colnames(a) <- c("i", "j", "x")
+  #class(a) <- append(class(a),"sparse.matrix")
+  class(a) <- append("sparse.matrix", class(a))
+  attributes(a)$true_dims = dims
+  return (a)
+}
+
+```
+
+
+## Sparse_add, sparse_multiply and Sparse_transpose
+Besides implementing sparse_multiply and Sparse_transpose, also modify sparse_add a little bit to meet the test file.
+
+In specific, rows in the output matrix is ordered by the column coordinate. (to pass the test file)
+                             
+```{r}
+#' Add two sparse matrices
+#'
+#' @description Add two sparse.matrix objects
+#' @param a a sparse matrix
+#' @param b a sparse matrix
+#' @return the sum of a and b in the sparse.matrix form.
+#' @export
+#' 
+sparse_add <- function(a, b) {
+  if (any(attributes(a)$true_dim != attributes(b)$true_dim)) stop("error message")
+  c <- merge(a, b, by = c("i", "j"), all = TRUE, suffixes = c("1", "2"))
+  c$x1[is.na(c$x1)] <- 0
+  c$x2[is.na(c$x2)] <- 0
+  c$x <- c$x1 + c$x2
+  out.df <- c[, c("i", "j", "x")][order(c$j),]
+  to_sparse_matrix(out.df, 
+                   dims = c(max(c[,1]), max(c[,2])))
+}
+
+#' Multiply two sparse matrices
+#'
+#' @description Multiply two sparse.matrix objects
+#' @param a a sparse matrix
+#' @param b a sparse matrix
+#' @return the product of a and b in the sparse.matrix form
+#' @export
+#' 
+sparse_multiply <- function(a, b){
+  if (any(attributes(a)$true_dim[2] != attributes(b)$true_dim[1])) stop("error message")
+  colnames(b) <- c("i2", "j2", "x2")
+  c <- merge(a, b, by.x = "j", by.y = "i2",
+             all = FALSE, suffixes = c("1", "2"))
+  c$x <- c$x * c$x2
+  c$key <- paste(c$i, c$j2, sep = "-")
+  x <- tapply(c$x, c$key, sum)
+  key <- strsplit(names(x), "-")
+  # d <- data.frame(i = sapply(key, getElement, 1),
+  #                 j = sapply(key, getElement, 2),
+  #                 x = as.numeric(x))
+  j = as.numeric(sapply(key, getElement, 2))
+  j_order <- order(j)
+  i = as.numeric(sapply(key, getElement, 1))
+  d <- sparse.matrix(i = i[j_order], 
+                     j = j[j_order], 
+                     x = as.numeric(x)[j_order], 
+                     dims = c(attributes(a)$true_dim[1], attributes(b)$true_dim[2]))
+  # attributes(a)$true_dims[1], attributes(b)$true_dims[2]
+  return (d)
+}
+
+#' Transpose a sparse matricx
+#'
+#' @description transpose a sparse matrix
+#' @param a a sparse.matrix object
+#' @return the trainsposed form of the sparse matrix
+#' @export
+#' 
+
+sparse_transpose <- function(a){
+  t <- a[,1]
+  a[,1] <- a[,2]
+  a[,2] <- t
+  attributes(a)$true_dims <- attributes(a)$true_dims[c(2,1)]
+  return (a)
+}
+```
+
+## Overload the functions / Use the generic function
+Reference: https://stackoverflow.com/questions/40580149/overload-matrix-multiplication-for-s3-class-in-r
++ and t are generic 
+```{r}
+# These three functions are pre-defined generic... ?
+# methods('t')
+# methods('+')
+# methods('%*%')
+
+# Overload addition / use generic functions
+`+.sparse.matrix` = function(e1, e2){ sparse_add(e1,e2)} 
+
+# Overload transpose
+t.sparse.matrix = function(x){sparse_transpose(x)}
+
+# Overload matrix multiplication
+`%*%.default` = .Primitive("%*%") # assign default as current definition
+`%*%` = function(x,...){ #make S3
+  UseMethod("%*%",x)
+}
+`%*%.sparse.matrix` = function(x,y) {sparse_multiply(x,y)} # define for sparse.matrix
+```
+
+## Show that all 3 functions are working correctly
+Select some conditions form the test file.
+```{r}
+sm1 <- sparse.matrix(i = c(1, 2), j = c(1, 1), x = c(3, 1), dims = c(3, 2))
+sm3 <- sparse.matrix(i = rep(1, 3), j = 1:3, x = 1:3, dims = c(2, 3))
+sm1_ori <- matrix(c(3,0,1,0,0,0), nrow=3, ncol=2, byrow = T)
+sm3_ori <- matrix(c(1,2,3,0,0,0), nrow=2, ncol=3, byrow = T)
+# %*% is correct
+sm1_ori %*% sm3_ori
+sm1 %*% sm3
+# + is correct
+sm1 + sm1
+sm1_ori + sm1_ori
+```
+

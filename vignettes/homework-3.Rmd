@@ -37,6 +37,8 @@ dtest <- d[!(1:1000 %in% train_index)]
 ```
 
 ```{r, fig.width=8, fig.height=6}
+# devtools::install_github("changchangsu/bis557")
+# library(bis557)
 # Calculate the kernel density estimation for a bunch of h
 hs <- seq(0.1,3.1,by=1)
 kernel_estimates <- sapply(hs, function(h){
