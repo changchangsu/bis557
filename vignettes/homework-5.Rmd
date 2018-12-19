@@ -43,7 +43,6 @@ s<-sample(seq_along(y_train),1000) # extract only 10000 samples to train the mod
 ## fit a LASSO
 fit <- cv.glmnet(x_train[s,], y_train[s], family = "multinomial")
 preds <- predict(fit$glmnet.fit, x_train[s,], s = fit$lambda.min, type = "class")
-table(as.vector(preds), y_train[s])
 ## out-of-sample prediction
 s_test <- sample(seq_along(y_test),1000)
 x_test <- array_reshape(x_test, c(10000,28^2))
@@ -181,14 +180,16 @@ print(history_emnist)
 
 ## Improve the original model by tuning the hyperparameters
 
+Try a (3,3) kernel at the first convolutional layer.
+
 As shown by the result above, the validation accuracy is higher than the training accuracy, suggesting that the model is underfitting the data rather than overfitting.
 
-Thus, consider eliminate the regularization in the model. As an example, we would reduce the drop out rate to 0.2 here.
+Thus, consider alleviate the regularization. As an example, we would reduce the drop out rate to 0.2 here.
 
 ```{r}
 model_emnist2 <- keras_model_sequential()
 model_emnist2 %>%
-  layer_conv_2d(filters = 32, kernel_size = c(2,2),
+  layer_conv_2d(filters = 32, kernel_size = c(3,3),
 input_shape = c(28, 28, 1),
                 padding = "same") %>%
 layer_activation(activation = "relu") %>%
@@ -224,7 +225,7 @@ fit(emnist_x_train, emnist_y_train, epochs = 10,
 print(history_emnist2)
 ```
 
-Both the accuracy (classification rate) on train data and valid data have improved compared to the orginal model.
+Both the accuracy (classification rate) on train data and valid data have (slightly) improved by the new model.
 
 # Neural Network with Robust Techniques
 3. CASL NUmber 8 in Exercises 8.11.

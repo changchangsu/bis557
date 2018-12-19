@@ -177,20 +177,7 @@ s&lt;-sample(seq_along(y_train),1000) # extract only 10000 samples to train the 
 ## fit a LASSO
 fit &lt;- cv.glmnet(x_train[s,], y_train[s], family = &quot;multinomial&quot;)
 preds &lt;- predict(fit$glmnet.fit, x_train[s,], s = fit$lambda.min, type = &quot;class&quot;)
-table(as.vector(preds), y_train[s])</code></pre>
-<pre><code>##    
-##       0   1   2   3   4   5   6   7   8   9
-##   0  95   0   0   0   0   1   0   0   0   0
-##   1   0 128   0   0   0   1   0   0   0   0
-##   2   0   0  94   0   0   0   0   0   1   0
-##   3   0   0   0  91   0   0   0   0   0   0
-##   4   0   0   0   0 107   0   0   0   0   0
-##   5   0   0   0   0   0  89   1   0   1   0
-##   6   0   0   0   0   0   0 108   0   0   0
-##   7   0   0   0   0   0   0   0  88   0   0
-##   8   0   0   0   0   0   1   0   0  90   1
-##   9   0   0   1   0   1   0   0   0   1 100</code></pre>
-<pre class="r"><code>## out-of-sample prediction
+## out-of-sample prediction
 s_test &lt;- sample(seq_along(y_test),1000)
 x_test &lt;- array_reshape(x_test, c(10000,28^2))
 preds_out &lt;- predict(fit$glmnet.fit, x_test[s_test,], s = fit$lambda.min, type = &quot;class&quot;)
@@ -248,7 +235,7 @@ history &lt;- model %&gt;% fit(
 pred_CNN = model %&gt;% evaluate(x_test, y_test)
 
 cat(&quot;The out-of-sample prediction accuracy of Convoluntional Neural Network:&quot;, pred_CNN$acc)</code></pre>
-<pre><code>## The out-of-sample prediction accuracy of Convoluntional Neural Network: 0.9791</code></pre>
+<pre><code>## The out-of-sample prediction accuracy of Convoluntional Neural Network: 0.977</code></pre>
 <p>As shown above, the out-of-sample prediction accuracy is increased by the CNN compared with LASSO.</p>
 </div>
 <div id="improve-the-classification-rate-in-a-cnn-model" class="section level1">
@@ -325,18 +312,19 @@ fit(emnist_x_train, emnist_y_train, epochs = 10,
 print(history_emnist)</code></pre>
 <pre><code>## Trained on 9,000 samples, validated on 1,000 samples (batch_size=32, epochs=10)
 ## Final epoch (plot to see history):
-##      acc: 0.7944
-##     loss: 0.6854
-##  val_acc: 0.869
-## val_loss: 0.4427</code></pre>
+##      acc: 0.7999
+##     loss: 0.6717
+##  val_acc: 0.854
+## val_loss: 0.4448</code></pre>
 </div>
 <div id="improve-the-original-model-by-tuning-the-hyperparameters" class="section level2">
 <h2>Improve the original model by tuning the hyperparameters</h2>
+<p>Try a (3,3) kernel at the first convolutional layer.</p>
 <p>As shown by the result above, the validation accuracy is higher than the training accuracy, suggesting that the model is underfitting the data rather than overfitting.</p>
-<p>Thus, consider eliminate the regularization in the model. As an example, we would reduce the drop out rate to 0.2 here.</p>
+<p>Thus, consider alleviate the regularization. As an example, we would reduce the drop out rate to 0.2 here.</p>
 <pre class="r"><code>model_emnist2 &lt;- keras_model_sequential()
 model_emnist2 %&gt;%
-  layer_conv_2d(filters = 32, kernel_size = c(2,2),
+  layer_conv_2d(filters = 32, kernel_size = c(3,3),
 input_shape = c(28, 28, 1),
                 padding = &quot;same&quot;) %&gt;%
 layer_activation(activation = &quot;relu&quot;) %&gt;%
@@ -372,11 +360,11 @@ fit(emnist_x_train, emnist_y_train, epochs = 10,
 print(history_emnist2)</code></pre>
 <pre><code>## Trained on 9,000 samples, validated on 1,000 samples (batch_size=32, epochs=10)
 ## Final epoch (plot to see history):
-##      acc: 0.9178
-##     loss: 0.2416
-##  val_acc: 0.895
-## val_loss: 0.3594</code></pre>
-<p>Both the accuracy (classification rate) on train data and valid data have improved compared to the orginal model.</p>
+##      acc: 0.9187
+##     loss: 0.2371
+##  val_acc: 0.898
+## val_loss: 0.45</code></pre>
+<p>Both the accuracy (classification rate) on train data and valid data have (slightly) improved by the new model.</p>
 </div>
 </div>
 <div id="neural-network-with-robust-techniques" class="section level1">
