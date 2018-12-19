@@ -95,7 +95,7 @@ model %>% compile(
 history <- model %>% fit(
   x_train, y_train, 
   epochs = 10, batch_size = 128, 
-  validation_split = 0.2
+  validation_data = list(x_test, y_test)
 )
 
 pred_CNN = model %>% evaluate(x_test, y_test)

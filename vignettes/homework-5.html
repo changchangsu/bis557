@@ -229,13 +229,13 @@ model %&gt;% compile(
 history &lt;- model %&gt;% fit(
   x_train, y_train, 
   epochs = 10, batch_size = 128, 
-  validation_split = 0.2
+  validation_data = list(x_test, y_test)
 )
 
 pred_CNN = model %&gt;% evaluate(x_test, y_test)
 
 cat(&quot;The out-of-sample prediction accuracy of Convoluntional Neural Network:&quot;, pred_CNN$acc)</code></pre>
-<pre><code>## The out-of-sample prediction accuracy of Convoluntional Neural Network: 0.977</code></pre>
+<pre><code>## The out-of-sample prediction accuracy of Convoluntional Neural Network: 0.9798</code></pre>
 <p>As shown above, the out-of-sample prediction accuracy is increased by the CNN compared with LASSO.</p>
 </div>
 <div id="improve-the-classification-rate-in-a-cnn-model" class="section level1">
@@ -312,10 +312,10 @@ fit(emnist_x_train, emnist_y_train, epochs = 10,
 print(history_emnist)</code></pre>
 <pre><code>## Trained on 9,000 samples, validated on 1,000 samples (batch_size=32, epochs=10)
 ## Final epoch (plot to see history):
-##      acc: 0.7999
-##     loss: 0.6717
-##  val_acc: 0.854
-## val_loss: 0.4448</code></pre>
+##      acc: 0.7996
+##     loss: 0.6554
+##  val_acc: 0.843
+## val_loss: 0.5447</code></pre>
 </div>
 <div id="improve-the-original-model-by-tuning-the-hyperparameters" class="section level2">
 <h2>Improve the original model by tuning the hyperparameters</h2>
@@ -360,10 +360,10 @@ fit(emnist_x_train, emnist_y_train, epochs = 10,
 print(history_emnist2)</code></pre>
 <pre><code>## Trained on 9,000 samples, validated on 1,000 samples (batch_size=32, epochs=10)
 ## Final epoch (plot to see history):
-##      acc: 0.9187
-##     loss: 0.2371
-##  val_acc: 0.898
-## val_loss: 0.45</code></pre>
+##      acc: 0.9178
+##     loss: 0.2326
+##  val_acc: 0.891
+## val_loss: 0.4374</code></pre>
 <p>Both the accuracy (classification rate) on train data and valid data have (slightly) improved by the new model.</p>
 </div>
 </div>
