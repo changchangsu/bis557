@@ -1,0 +1,278 @@
+---
+title: "homework-5"
+author: "Chang Su"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    self_contained: yes
+    toc: true
+---
+<!--
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteIndexEntry{The Vignette for Homework 5}
+-->
+
+# Apply CNN on MNIST data set
+1. In class we used the LASSO to predict hand-writting characters in the MNIST data set. Increase the out-of-sample prediction accuracy by extracting predictive features from the images.
+  
+Apply convolutional neural network to extract predictive features. Compare its performance with LASSO:
+
+```{r,message=FALSE}
+library('keras') # a powerful API for deep learning with R (high-level interface to backend )
+library(glmnet)
+library(doMC)
+registerDoMC()
+#install_keras() 
+
+# Import the MINST data set.
+mnist <- dataset_mnist()
+x_train <- mnist$train$x
+dim(x_train) # 60000 samples with 28*28 pixels
+y_train <- mnist$train$y
+x_test <- mnist$test$x
+dim(x_test)
+y_test <- mnist$test$y
+
+# Prediction Model by LASSO
+## rearrange the data
+x_train <- array_reshape(x_train, c(60000,28^2))
+y_train <- factor(y_train)
+## subset the data
+set.seed(1234)
+s<-sample(seq_along(y_train),1000) # extract only 10000 samples to train the model: 6W is too slow to train by LASSO
+## fit a LASSO
+fit <- cv.glmnet(x_train[s,], y_train[s], family = "multinomial")
+preds <- predict(fit$glmnet.fit, x_train[s,], s = fit$lambda.min, type = "class")
+table(as.vector(preds), y_train[s])
+## out-of-sample prediction
+s_test <- sample(seq_along(y_test),1000)
+x_test <- array_reshape(x_test, c(10000,28^2))
+preds_out <- predict(fit$glmnet.fit, x_test[s_test,], s = fit$lambda.min, type = "class")
+t <- table(as.vector(preds_out), y_test[s_test])
+cat("The out-of-sample prediction accuracy of LASSO: ", sum(diag(t)) / sum(t))
+
+# Predictino Model by CNN
+img_rows <- 28
+img_cols <- 28
+
+x_train <- array_reshape(x_train, c(nrow(x_train), img_rows, img_cols, 1))
+x_test <- array_reshape(x_test, c(nrow(x_test), img_rows, img_cols, 1))
+input_shape <- c(img_rows, img_cols, 1)
+
+# rescale
+# x_train <- x_train / 255
+# x_test <- x_test / 255
+
+# convert the vectors to binary
+y_train <- to_categorical(y_train, 10)
+y_test <- to_categorical(y_test, 10)
+
+# define the model
+model <- keras_model_sequential() 
+model %>% 
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+input_shape = c(28, 28, 1),
+                padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_dropout(rate = 0.5) %>%
+layer_flatten() %>%
+layer_dense(units = 256) %>%
+layer_activation(activation = "relu") %>%
+layer_dropout(rate = 0.4) %>%
+layer_dense(units = 128) %>%
+layer_activation(activation = "relu") %>%
+layer_dropout(rate = 0.3) %>%
+layer_dense(units = 10) %>%
+layer_activation(activation = "softmax")
+
+#summary(model)
+model %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+history <- model %>% fit(
+  x_train, y_train, 
+  epochs = 10, batch_size = 128, 
+  validation_split = 0.2
+)
+
+pred_CNN = model %>% evaluate(x_test, y_test)
+
+cat("The out-of-sample prediction accuracy of Convoluntional Neural Network:", pred_CNN$acc)
+```
+
+As shown above, the out-of-sample prediction accuracy is increased by the CNN compared with LASSO.
+
+# Improve the Classification Rate in a CNN model
+2. CASL Number 4 in Exercises 8.11. 
+
+Adjust the kernel size, and any other parameters you think are useful, in the convolutional neural network for EMNIST in Section 8.10.4. Can you improve on the classification rate?
+
+Note that the emnist dataset in this vignette is a 10,000 random sample from https://www.kaggle.com/crawford/emnist#emnist-letters-train.csv. It's different from the dataset used in CASL. Thus we train the original CNN model(from CASL section 8.10.4) again on this dataset as the reference for the new model.
+
+## Pre-process the data
+```{r}
+library(bis557)
+data(emnist)
+dim(emnist)
+
+# split the data into train (90%) and valid (10%) set.
+set.seed(1234)
+emnist_split = rep(1,nrow(emnist))
+emnist_split[sample(1:nrow(emnist),round(nrow(emnist)*0.1))] = 0
+
+emnist_x <- array_reshape(as.matrix(emnist[,-1]), c(nrow(emnist), img_rows, img_cols, 1))
+emnist_y <- as.matrix(emnist[,1]) - 1 #integers from 0 to num_classes
+colnames(emnist_y) = NULL
+emnist_y <- to_categorical(emnist_y, num_classes=26L)
+
+emnist_x_train <- emnist_x[emnist_split == 1,,,,drop=FALSE]
+emnist_x_valid <- emnist_x[emnist_split == 0,,,,drop=FALSE]
+emnist_y_train <- emnist_y[emnist_split == 1,]
+emnist_y_valid <- emnist_y[emnist_split == 0,]
+
+# 90% for training and 10% for testing
+dim(emnist_x_train)
+dim(emnist_x_valid)
+```
+
+## Fit the original model from CASL
+```{r}
+model_emnist <- keras_model_sequential()
+model_emnist %>%
+  layer_conv_2d(filters = 32, kernel_size = c(2,2),
+input_shape = c(28, 28, 1),
+                padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+              padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_dropout(rate = 0.5) %>%
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+              padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_dropout(rate = 0.5) %>%
+layer_flatten() %>%
+layer_dense(units = 128) %>%
+layer_activation(activation = "relu") %>%
+layer_dense(units = 128) %>%
+layer_activation(activation = "relu") %>%
+layer_dropout(rate = 0.5) %>%
+layer_dense(units = 26) %>%
+layer_activation(activation = "softmax")
+
+model_emnist %>% compile(loss = 'categorical_crossentropy',
+                  optimizer = optimizer_rmsprop(),
+                  metrics = c('accuracy'))
+
+history_emnist <- model_emnist %>%
+fit(emnist_x_train, emnist_y_train, epochs = 10,
+    validation_data = list(emnist_x_valid, emnist_y_valid))
+print(history_emnist)
+```
+
+## Improve the original model by tuning the hyperparameters
+
+As shown by the result above, the validation accuracy is higher than the training accuracy, suggesting that the model is underfitting the data rather than overfitting.
+
+Thus, consider eliminate the regularization in the model. As an example, we would reduce the drop out rate to 0.2 here.
+
+```{r}
+model_emnist2 <- keras_model_sequential()
+model_emnist2 %>%
+  layer_conv_2d(filters = 32, kernel_size = c(2,2),
+input_shape = c(28, 28, 1),
+                padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+              padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_dropout(rate = 0.2) %>%
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+              padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_conv_2d(filters = 32, kernel_size = c(2,2),
+padding = "same") %>%
+layer_activation(activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_dropout(rate = 0.2) %>%
+layer_flatten() %>%
+layer_dense(units = 128) %>%
+layer_activation(activation = "relu") %>%
+layer_dense(units = 128) %>%
+layer_activation(activation = "relu") %>%
+layer_dropout(rate = 0.2) %>%
+layer_dense(units = 26) %>%
+layer_activation(activation = "softmax")
+
+model_emnist2 %>% compile(loss = 'categorical_crossentropy',
+                  optimizer = optimizer_rmsprop(),
+                  metrics = c('accuracy'))
+
+history_emnist2 <- model_emnist2 %>%
+fit(emnist_x_train, emnist_y_train, epochs = 10,
+    validation_data = list(emnist_x_valid, emnist_y_valid))
+print(history_emnist2)
+```
+
+Both the accuracy (classification rate) on train data and valid data have improved compared to the orginal model.
+
+# Neural Network with Robust Techniques
+3. CASL NUmber 8 in Exercises 8.11.
+
+Write a function that uses mean absolute deviation as a loss function, instead of mean squared error. Test the use of this function with a simulation containing several outliers. How well do neural networks and SGD perform when using robust techniques?
+
+```{r}
+# Derivative of the mean absolute deviation (MAE) function.
+#
+# Args:
+#     y: A numeric vector of responses.
+#     a: A numeric vector of predicted responses.
+#
+# Returns:
+#     Returned current derivative the MAE function.
+casl_util_mae_p <-
+function(y, a)
+{
+  if (y>a) d = 1
+  if (y<a) d = -1
+  if (y==a) d = 0
+  return(d)
+}
+
+# Simulate a dataset   
+set.seed(2345)
+X <- matrix(runif(1000, min=-1, max=1), ncol=1)
+X[sample(seq_along(X),5)] <- runif(5, min = 4, max = 5)
+y <- X[,1,drop = FALSE]^2 + rnorm(1000, sd = 0.1)
+weights_mae <- casl_nn_sgd(X, y, sizes=c(1, 25, 1), epochs=25, eta=0.01, loss = "mae")
+y_pred_mae <- casl_nn_predict(weights_mae, X)
+
+weights_mse <- casl_nn_sgd(X, y, sizes=c(1, 25, 1), epochs=25, eta=0.01, loss = "mse")
+y_pred_mse <- casl_nn_predict(weights_mse, X)
+
+mean((y-y_pred_mse)^2)
+mean((y-y_pred_mae)^2)
+mean(abs(y-y_pred_mse))
+mean(abs(y-y_pred_mae))
+
+result_df <- data.frame(x = X[,1], y = y, y_mse <- y_pred_mse, y_mae <- y_pred_mae)
+library(ggplot2)
+ggplot(result_df, aes(x = x)) +
+  geom_point(aes(y = y)) +
+  geom_point(aes(y = y_pred_mae, color = "mae"))+
+  geom_point(aes(y = y_pred_mse, color = "mse")) +
+  labs(title = "Compare Robust Loss Function (MAE) with MSE", col = "loss function")
+```
+
+MSE and MAE are both smaller for predictions from MSE (in the sense that the prediciton is given by the weights trained using MSE as loss function), indicating that in the average sense, using MSE may be a better choice. However, if we zoom in and only focus on the outliers, we can see that the prediciton from MSE are closer to the outliers and the prediction from MAE are more robust in the sense that they are not completely 'driven away' by the abnormally large outliers. Hence, the predictions from MAE are more robust to outliers.
+

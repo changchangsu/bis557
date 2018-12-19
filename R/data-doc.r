@@ -27,3 +27,12 @@ NULL
 #' For illustration, we would use this data set to assess the prediction error of 
 #' the ridge regreession model built on training data.
 "ridge_test"
+
+#' emnist data for CNN modelling
+#'
+#' @name emnist
+#' @docType data
+#' @rdname emnist
+#' @description a 1W sample of emnist data downloaded from Kaggle
+#' @source \url{https://www.kaggle.com/crawford/emnist#emnist-letters-train.csv}
+"emnist"
